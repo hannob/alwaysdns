@@ -1,0 +1,130 @@
+#!/usr/bin/python3
+
+import argparse
+import dns.resolver
+import socket
+import ipaddress
+
+
+def errormsg(msg):
+    print(f"ERROR: {msg}")
+
+
+def infomsg(msg):
+    global args
+    if not args.quiet:
+        print(f"INFO: {msg}")
+
+
+def debugmsg(msg):
+    global args
+    if args.debug:
+        print(f"DEBUG: {msg}")
+
+
+def check_srv(host):
+    for prot in ["submission", "pop3", "imap"]:  # , "xmpp-client", "xmpp-server" ]:
+        try:
+            plain = dns.resolver.resolve(f"_{prot}._tcp.{host}", "SRV")
+            debugmsg(plain.rrset)
+            plainpriority = plain.rrset[0].priority
+        except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer):
+            plain = False
+        try:
+            secure = dns.resolver.resolve(f"_{prot}s._tcp.{host}", "SRV")
+            debugmsg(secure.rrset)
+            securepriority = secure.rrset[0].priority
+        except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer):
+            secure = False
+
+        if plain and not secure:
+            errormsg(f"SRV record for {prot} (plaintext), but not for {prot}s (TLS)")
+
+        if plain and secure:
+            # Note: Lower value means higher priority
+            if plainpriority < securepriority:
+                errormsg(
+                    f"SRV record for secure {prot} with lower priority than plaintext"
+                )
+            if plainpriority == securepriority:
+                errormsg(
+                    f"SRV record for secure {prot} with same priority as plaintext"
+                )
+
+
+def check_dmarc(host):
+    infomsg("Checking DMARC record")
+    try:
+        ret = dns.resolver.resolve(f"_dmarc.{host}", "TXT")
+    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer):
+        infomsg("No DMARC")
+        return
+
+    for r in ret:
+        dmarc = r.strings[0].decode()
+        if not dmarc.startswith("v=DMARC1"):
+            errormsg("DMARC record with invalid content")
+
+
+def check_spf(host):
+    infomsg("Checking SPF records")
+    ret = dns.resolver.resolve(host, "SPF", raise_on_no_answer=False)
+    if ret.rrset is not None:
+        errormsg("Host has deprecated SPF record (RFC 7208 3.1).")
+
+
+def check_mx(host):
+    infomsg("Checking for MX records with IP addresses...")
+    ret = dns.resolver.resolve(host, "MX")
+    for mx in ret:
+        mxc = str(mx.exchange).rstrip(".")
+        try:
+            ip = ipaddress.ip_address(mxc)
+            errormsg(f"IP {ip} in MX record")
+        except ValueError:
+            debugmsg(f"MX record {mxc} is no IP (good)")
+
+
+def check_soa(host):
+    infomsg("Getting name servers...")
+    ret = dns.resolver.resolve(host, "NS")
+    nameservers = []
+    for ns in ret.rrset:
+        nameservers.append(str(ns))
+    debugmsg("Nameservers: %s" % ",".join(nameservers))
+
+    infomsg("Checking SOA record consistency")
+    soa = []
+    for ns in nameservers:
+        # this is ipv4 only for now
+        ip = socket.gethostbyname(ns)
+        debugmsg(f"Nameserver {ns} IP: {ip}")
+
+        nsr = dns.resolver.Resolver()
+        nsr.nameservers = [ip]
+
+        ret = nsr.resolve(host, "SOA")
+        soa.append(str(ret.rrset))
+
+    if len(set(soa)) != 1:
+        errormsg("SOA records are not consistent across nameservers")
+
+
+ap = argparse.ArgumentParser()
+ap.add_argument("domain", nargs="+", help="Domain names to scan")
+ap.add_argument("-q", "--quiet", action="store_true", help="Output only ERROR messages")
+ap.add_argument("-d", "--debug", action="store_true", help="Output DEBUG messages")
+ap.add_argument("-t", "--tests", help="Comma-separated list of tests to run")
+
+args = ap.parse_args()
+
+tests = [check_soa, check_spf, check_dmarc, check_srv, check_mx]
+
+if args.tests:
+    tests = []
+    for t in args.tests.split(","):
+        tests.append(locals()["check_" + t])
+
+for domain in args.domain:
+    for test in tests:
+        test(domain)
