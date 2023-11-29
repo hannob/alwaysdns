@@ -91,7 +91,12 @@ def check_mx(host):
 
 def check_soa(host):
     infomsg("Getting name servers...")
-    ret = dns.resolver.resolve(host, "NS")
+    try:
+        ret = dns.resolver.resolve(host, "NS")
+    except dns.resolver.NoAnswer:
+        # FIXME: maybe check upper records instead
+        infomsg("No direct NS records")
+        return
     nameservers = []
     for ns in ret.rrset:
         nameservers.append(str(ns))
