@@ -11,13 +11,11 @@ def errormsg(msg):
 
 
 def infomsg(msg):
-    global args
     if not args.quiet:
         print(f"INFO: {msg}")
 
 
 def debugmsg(msg):
-    global args
     if args.debug:
         print(f"DEBUG: {msg}")
 
