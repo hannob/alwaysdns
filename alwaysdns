@@ -1,9 +1,10 @@
 #!/usr/bin/python3
 
 import argparse
-import dns.resolver
-import socket
 import ipaddress
+import socket
+
+import dns.resolver
 
 
 def errormsg(msg):
