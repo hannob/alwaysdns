@@ -75,7 +75,11 @@ def check_spf(host):
 
 def check_mx(host):
     infomsg("Checking for MX records with IP addresses...")
-    ret = dns.resolver.resolve(host, "MX")
+    try:
+        ret = dns.resolver.resolve(host, "MX")
+    except dns.resolver.NoAnswer:
+        infomsg("No MX")
+        return
     for mx in ret:
         mxc = str(mx.exchange).rstrip(".")
         try:
