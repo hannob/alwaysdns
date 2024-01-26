@@ -38,17 +38,17 @@ def check_srv(host):
             secure = False
 
         if plain and not secure:
-            errormsg(f"SRV record for {prot} (plaintext), but not for {prot}s (TLS)")
+            errormsg(f"{host} SRV record for {prot} (plaintext), but not for {prot}s (TLS)")
 
         if plain and secure:
             # Note: Lower value means higher priority
             if plainpriority < securepriority:
                 errormsg(
-                    f"SRV record for secure {prot} with lower priority than plaintext"
+                    f"{host} SRV record for secure {prot} with lower priority than plaintext"
                 )
             if plainpriority == securepriority:
                 errormsg(
-                    f"SRV record for secure {prot} with same priority as plaintext"
+                    f"{host} SRV record for secure {prot} with same priority as plaintext"
                 )
 
 
