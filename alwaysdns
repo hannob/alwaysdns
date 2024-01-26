@@ -22,6 +22,7 @@ def debugmsg(msg):
 
 
 def check_srv(host):
+    infomsg("Checking SRV record")
     for prot in ["submission", "pop3", "imap"]:  # , "xmpp-client", "xmpp-server" ]:
         try:
             plain = dns.resolver.resolve(f"_{prot}._tcp.{host}", "SRV")
