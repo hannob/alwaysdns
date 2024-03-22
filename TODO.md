@@ -17,3 +17,4 @@ Things that could be implemented:
 * Warn about very low TTLs https://blog.apnic.net/2019/11/12/stop-using-ridiculously-low-dns-ttls/
 * Warn about obsolete Sender ID/spf2.0 records https://datatracker.ietf.org/doc/status-change-change-sender-id-to-historic/
 * CAA record basic correctness
+* MX is not allowed to be a CNAME record, see https://www.cloudflare.com/learning/dns/dns-records/dns-mx-record/
