@@ -19,3 +19,4 @@ Things that could be implemented:
 * Warn about obsolete Sender ID/spf2.0 records https://datatracker.ietf.org/doc/status-change-change-sender-id-to-historic/
 * CAA record basic correctness
 * MX is not allowed to be a CNAME record, see https://www.cloudflare.com/learning/dns/dns-records/dns-mx-record/
+* CNAME and conflicting other records (e.g., MX) at the same time
