@@ -100,7 +100,7 @@ def check_soa(host):
     nameservers = []
     for ns in ret.rrset:
         nameservers.append(str(ns))
-    debugmsg("Nameservers: %s" % ",".join(nameservers))
+    debugmsg(f"Nameservers: {','.join(nameservers)}")
 
     infomsg("Checking SOA record consistency")
     soa = []
