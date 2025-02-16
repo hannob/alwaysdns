@@ -7,6 +7,7 @@ Things that could be implemented:
 * Warn about old-style SPF records
 * SPF all must be last
 * SPF number of lookups restricted
+* SPF CIDR net with masked 1 bits (probably not RFC incompliant)
 * DMARC syntax
 * DMARC mailto and reporting mail consistency
 * unexpected leading/trailing whitespaces in TXT records
