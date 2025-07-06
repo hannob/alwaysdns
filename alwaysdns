@@ -1,14 +1,23 @@
 #!/usr/bin/python3
 
 import argparse
+import base64
 import ipaddress
+import pathlib
+import re
 import socket
 
 import dns.resolver
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 
 def errormsg(msg):
     print(f"ERROR: {msg}")
+
+
+def warnmsg(msg):
+    print(f"WARNING: {msg}")
 
 
 def infomsg(msg):
@@ -119,11 +128,108 @@ def check_soa(host):
         errormsg("SOA records are not consistent across nameservers")
 
 
+def check_dkim_string(dkimrecord):
+    if '"' in dkimrecord:
+        dsplit = dkimrecord.split('"')
+        rec = ""
+        for i, s in enumerate(dsplit):
+            if i % 2 == 1:
+                rec += s
+    else:
+        rec = dkimrecord
+
+    rdat = {}
+    for val in rec.split(";"):
+        if val.strip() == "":
+            continue
+        if "=" not in val:
+            errormsg(f"DKIM: no key value pair {val!r}")
+            return
+        k, v = val.split("=", 1)
+        rdat[k.strip()] = v.strip()
+
+    if "p" not in rdat:
+        errormsg('DKIM: no public key ("p=") found')
+        return
+
+    if "k" not in rdat or rdat["k"] == "rsa":
+        kty = "rsa"
+    elif rdat["k"] == "ed25519":
+        kty = "ed25519"
+    else:
+        errormsg(f"DKIM: unknown key type {rdat['k']}")
+        return
+
+    if " " in rdat["p"]:
+        warnmsg("DKIM: unnecessary space in key")
+        rdat["p"] = rdat["p"].replace(" ", "")
+    if rdat["p"] != re.sub(r"[^0-9a-zA-Z+/=]", "", rdat["p"]):
+        errormsg("DKIM: invalid base64 chars")
+        rdat["p"] = re.sub(r"[^0-9a-zA-Z+/=]", "", rdat["p"])
+
+    try:
+        raw = base64.b64decode(rdat["p"])
+    except ValueError:
+        errormsg("DKIM: cannot decode base64")
+        return
+
+    if kty == "rsa":
+        try:
+            key = serialization.load_der_public_key(raw)
+        except ValueError:
+            try:
+                key = serialization.load_der_private_key(raw, None)
+                errormsg("DKIM: private key instead of public key")
+            except ValueError:
+                errormsg("DKIM: cannot decode public key")
+                return
+
+        if not isinstance(key, rsa.RSAPublicKey):
+            errormsg(f"DKIM: RSA key expected, got {type(key).__name__}")
+            return
+        pemspki = key.public_bytes(serialization.Encoding.PEM,
+                                   serialization.PublicFormat.SubjectPublicKeyInfo)
+        pempkcs1 = key.public_bytes(serialization.Encoding.PEM,
+                                    serialization.PublicFormat.PKCS1)
+        pemspki = "".join(pemspki.decode().split("\n")[1:-2])
+        pempkcs1 = "".join(pempkcs1.decode().split("\n")[1:-2])
+        if rdat["p"] == pemspki:
+            # unfortunately, the DKIM RFC 6376 is inconsistent whether
+            # SPKI or PKCS1 should be used, but in practice,
+            # everyone uses SPKI.
+            infomsg(f"DKIM: Found valid RSA key ({key.key_size} bit)")
+        elif rdat["p"] == pempkcs1:
+            errormsg("DKIM: Key in PKCS1 format")
+        else:
+            errormsg("DKIM: Reencoded RSA key mismatch")
+    elif kty == "ed25519":
+        if len(raw) != 32:
+            errormsg(f"DKIM: Ed25519 key with wrong length ({len(raw)} instead of 32)")
+        else:
+            infomsg("DKIM: Found valid Ed25519 key")
+
+
+def check_dkim(dkimhost):
+    infomsg(f"DKIM Checking key record {dkimhost}")
+    try:
+        r = dns.resolver.resolve(dkimhost, "TXT")
+    except dns.resolver.NoAnswer:
+        infomsg(f"No DKIM record at {dkimhost}")
+        return
+    dkimrec = ""
+    for s in r[0].strings:
+        dkimrec += s.decode()
+    check_dkim_string(dkimrec)
+
+
 ap = argparse.ArgumentParser()
 ap.add_argument("domain", nargs="+", help="Domain names to scan")
 ap.add_argument("-q", "--quiet", action="store_true", help="Output only ERROR messages")
 ap.add_argument("-d", "--debug", action="store_true", help="Output DEBUG messages")
 ap.add_argument("-t", "--tests", help="Comma-separated list of tests to run")
+ap.add_argument("--dkimsel", help="DKIM selector")
+ap.add_argument("--dkim", action="store_true", help="Pass only DKIM TXT record host")
+ap.add_argument("--dkimfile", action="store_true", help="Check DKIM key record in file")
 
 args = ap.parse_args()
 
@@ -135,5 +241,15 @@ if args.tests:
         tests.append(locals()["check_" + t])
 
 for domain in args.domain:
+    if args.dkim:
+        check_dkim(domain)
+        continue
+    if args.dkimfile:
+        dkimtxt = pathlib.Path(domain).read_text()
+        check_dkim_string(dkimtxt)
+        continue
+
     for test in tests:
         test(domain)
+    if args.dkimsel:
+        check_dkim(f"{args.dkimsel}._domainkey.{domain}")
