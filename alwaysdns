@@ -79,6 +79,8 @@ def check_dmarc(host):
 
     dmarcdata = {}
     for f in dmarc.split(";"):
+        if f.strip() == "":
+            continue
         fs = f.split("=", 2)
         if len(fs) != 2:
             errormsg("DMARC: Error parsing key/value pairs")
