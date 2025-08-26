@@ -98,6 +98,10 @@ def check_dmarc(host):
                         errormsg("DMARC: Cannot parse reporting mail address")
                         continue
                     repdom = m[1]
+                    if host == repdom:
+                        # host and reporting mail domain match,
+                        # no need for reporting record
+                        continue
 
                     try:
                         reprec = f"{host}._report._dmarc.{repdom}"
