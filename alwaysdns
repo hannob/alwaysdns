@@ -69,10 +69,46 @@ def check_dmarc(host):
         infomsg("No DMARC")
         return
 
-    for r in ret:
-        dmarc = r.strings[0].decode()
-        if not dmarc.startswith("v=DMARC1"):
-            errormsg("DMARC record with invalid content")
+    if len(ret) > 1:
+        errormsg("DMARC: More than one record")
+
+    dmarc = ret[0].strings[0].decode()
+    if not dmarc.startswith("v=DMARC1"):
+        errormsg("DMARC: record with invalid content")
+
+    dmarcdata = {}
+    for f in dmarc.split(";"):
+        fs = f.split("=", 2)
+        if len(fs) != 2:
+            errormsg("DMARC: Error parsing key/value pairs")
+            continue
+        if fs[0] in dmarcdata:
+            errormsg("DMARC: duplicate value")
+            continue
+        dmarcdata[fs[0].strip()] = fs[1].strip()
+
+    for rep in ["ruf", "rua"]:
+        if rep in dmarcdata:
+            for uri in dmarcdata[rep].split(","):
+                if uri.startswith("mailto:"):
+                    email = uri.split(":", 2)[1]
+                    m = email.split("@", 2)
+                    if len(m) != 2:
+                        errormsg("DMARC: Cannot parse reporting mail address")
+                        continue
+                    repdom = m[1]
+
+                    try:
+                        reprec = f"{host}._report._dmarc.{repdom}"
+                        ret = dns.resolver.resolve(reprec, "TXT")
+                    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer):
+                        errormsg(f"DMARC: {rep} email error, {reprec} does not exist")
+                        continue
+                    if len(ret) > 1:
+                        errormsg(f"DMARC: Multiple reporting records at {reprec}")
+                    repstr = ret[0].strings[0].decode()
+                    if not repstr.startswith("v=DMARC1"):
+                        errormsg(f"DMARC: {rep} email error, {reprec} invalid")
 
 
 def check_spf(host):

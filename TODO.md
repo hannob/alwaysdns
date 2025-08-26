@@ -10,7 +10,6 @@ Things that could be implemented:
 * SPF number of lookups restricted
 * SPF CIDR net with masked 1 bits (probably not RFC incompliant)
 * DMARC syntax
-* DMARC mailto and reporting mail consistency
 * unexpected leading/trailing whitespaces in TXT records
 * SMTP TLS reporting syntax
 * ANY amplification
