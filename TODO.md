@@ -21,3 +21,4 @@ Things that could be implemented:
 * MX is not allowed to be a CNAME record, see https://www.cloudflare.com/learning/dns/dns-records/dns-mx-record/
 * CNAME and conflicting other records (e.g., MX) at the same time
 * DKIM key syntax, key type match, encoding (RSA PKCS #8, not #1, ed25519 raw encoding)
+* DMARC reporting host may override rua, should also be verified
