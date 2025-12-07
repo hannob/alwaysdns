@@ -293,7 +293,7 @@ def check_mtasts(host):
         with urllib.request.urlopen(mtaurl) as r:
             mtapolicy = r.read()
     except urllib.error.URLError:
-        errormsg("MTA-STS record found, but error fetching policy")
+        errormsg(f"MTA-STS record {mtahost} found, but error fetching policy")
         return
     mtapolicy = mtapolicy.decode().split("\n")
     if mtapolicy[0].rstrip() != "version: STSv1":
