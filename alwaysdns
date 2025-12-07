@@ -7,6 +7,7 @@ import ipaddress
 import pathlib
 import re
 import socket
+import urllib.request
 
 import dns.resolver
 from cryptography.hazmat.primitives import serialization
@@ -265,6 +266,53 @@ def check_dkim(dkimhost):
     check_dkim_string(dkimrec)
 
 
+def check_mtasts(host):
+    infomsg("Checking MTA-STS")
+    mtahost = f"_mta-sts.{host}"
+    try:
+        r = dns.resolver.resolve(mtahost, "TXT")
+    except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
+        infomsg(f"No MTA-STS record at {mtahost}")
+        return
+    mtarec = None
+    for rec in r:
+        srec = ""
+        for s in rec.strings:
+            srec += s.decode()
+        if srec.startswith("v=STSv1"):
+            mtarec = srec
+        elif srec.startswith("v=STSv"):
+            errormsg("Unknown MTA-STS version")
+            return
+    if not mtarec:
+        infomsg(f"Found TXT records at {mtahost}, but none is mta-sts record")
+        return
+    infomsg("Found MTA-STS record")
+    mtaurl = f"https://mta-sts.{host}/.well-known/mta-sts.txt"
+    try:
+        with urllib.request.urlopen(mtaurl) as r:
+            mtapolicy = r.read()
+    except urllib.error.URLError:
+        errormsg("MTA-STS record found, but error fetching policy")
+        return
+    mtapolicy = mtapolicy.decode().split("\n")
+    if mtapolicy[0].rstrip() != "version: STSv1":
+        errormsg("MTA-STS policy does not start with 'version: STSv1'")
+    for mline in mtapolicy:
+        if mline.strip() == "":
+            continue
+        if ":" not in mline:
+            errormsg("Invalid MTA-STS policy file")
+            return
+        k, v = mline.split(":", maxsplit=1)
+        v = v.strip()
+        if k == "mode" and v == "report":
+            # used until draft-ietf-uta-mta-sts-12
+            errormsg("Obsolete (draft version) 'mode: report' MTA-STS mode")
+        elif k == "mode" and v not in ["testing", "enforce", "none"]:
+            errormsg("Invalid MTA-STS mode")
+
+
 ap = argparse.ArgumentParser()
 ap.add_argument("domain", nargs="+", help="Domain names to scan")
 ap.add_argument("-q", "--quiet", action="store_true", help="Output only ERROR messages")
@@ -276,7 +324,7 @@ ap.add_argument("--dkimfile", action="store_true", help="Check DKIM key record i
 
 args = ap.parse_args()
 
-tests = [check_soa, check_spf, check_dmarc, check_srv, check_mx]
+tests = [check_soa, check_spf, check_dmarc, check_srv, check_mx, check_mtasts]
 
 if args.tests:
     tests = []
