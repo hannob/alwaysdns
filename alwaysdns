@@ -71,12 +71,20 @@ def check_dmarc(host):
         infomsg("No DMARC")
         return
 
-    if len(ret) > 1:
-        errormsg("DMARC: More than one record")
+    dmarc = None
+    for r in ret:
+        rec = r.strings[0].decode()
+        if not rec.startswith("v=DMARC1"):
+            if rec.startswith("v=DMARC"):
+                errormsg("DMARC: Invalid version")
+            continue
+        if dmarc:
+            errormsg("DMARC: More than one record")
+        dmarc = rec
 
-    dmarc = ret[0].strings[0].decode()
-    if not dmarc.startswith("v=DMARC1"):
-        errormsg("DMARC: record with invalid content")
+    if not dmarc:
+        infomsg(f"Found TXT records at _dmarc.{host}, but none is DMARC record")
+        return
 
     dmarcdata = {}
     for f in dmarc.split(";"):
