@@ -321,6 +321,20 @@ def check_mtasts(host):
             errormsg("Invalid MTA-STS mode")
 
 
+def check_adsp(host):
+    adsphost = f"_adsp._domainkey.{host}"
+    try:
+        r = dns.resolver.resolve(adsphost, "TXT")
+    except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
+        return
+    for rec in r:
+        txtrec = b"".join(rec.strings).strip()
+        if txtrec.startswith(b"dkim="):
+            # https://datatracker.ietf.org/doc/status-change-adsp-rfc5617-to-historic/
+            # "Current deployment of ADSP is not recommended."
+            errormsg(f"ADSP (historic/not recommended) record at {adsphost}")
+
+
 ap = argparse.ArgumentParser()
 ap.add_argument("domain", nargs="+", help="Domain names to scan")
 ap.add_argument("-q", "--quiet", action="store_true", help="Output only ERROR messages")
@@ -332,7 +346,7 @@ ap.add_argument("--dkimfile", action="store_true", help="Check DKIM key record i
 
 args = ap.parse_args()
 
-tests = [check_soa, check_spf, check_dmarc, check_srv, check_mx, check_mtasts]
+tests = [check_soa, check_spf, check_dmarc, check_srv, check_mx, check_mtasts, check_adsp]
 
 if args.tests:
     tests = []
