@@ -22,3 +22,4 @@ Things that could be implemented:
 * CNAME and conflicting other records (e.g., MX) at the same time
 * DKIM key syntax, key type match, encoding (RSA PKCS #8, not #1, ed25519 raw encoding)
 * DMARC reporting host may override rua, should also be verified
+* Null MX: check there are no other MX records (RFC 7505 chapter 3.)
