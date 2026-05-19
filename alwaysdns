@@ -128,10 +128,22 @@ def check_dmarc(host):
 
 
 def check_spf(host):
-    infomsg("Checking SPF records")
+    infomsg("Checking for obsolete SPF records")
     ret = dns.resolver.resolve(host, "SPF", raise_on_no_answer=False)
     if ret.rrset is not None:
         errormsg("Host has deprecated SPF record (RFC 7208 3.1).")
+    infomsg("Checking for obsolete Sender-ID/spf2.0 records and invalid SPF versions")
+    try:
+        ret = dns.resolver.resolve(host, "TXT")
+    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer):
+        return
+    for r in ret:
+        rec = r.strings[0].decode()
+        if rec.startswith("v=spf") and not rec.startswith("v=spf1 "):
+            errormsg(f"SPF TXT record on {host} with invalid version")
+        if rec.startswith("spf2.0/"):
+            # https://datatracker.ietf.org/doc/status-change-change-sender-id-to-historic/
+            errormsg(f"Obsolete Sender-ID/spf2.0 TXT record on {host}")
 
 
 def check_mx(host):
