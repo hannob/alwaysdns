@@ -99,6 +99,12 @@ def check_dmarc(host):
             continue
         dmarcdata[fs[0].strip()] = fs[1].strip()
 
+    # check for obsolete tags
+    # https://datatracker.ietf.org/doc/html/rfc9989#name-tags-removed
+    for tag in ["pct", "rf", "ri"]:
+        if tag in dmarcdata:
+            errormsg(f"DMARC: obsolete '{tag}' tag (RFC 9989)")
+
     for rep in ["ruf", "rua"]:
         if rep in dmarcdata:
             for uri in dmarcdata[rep].split(","):
