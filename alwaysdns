@@ -105,6 +105,9 @@ def check_dmarc(host):
         if tag in dmarcdata:
             errormsg(f"DMARC: obsolete '{tag}' tag (RFC 9989)")
 
+    if "fo" in dmarcdata and "ruf" not in dmarcdata:
+        errormsg("DMARC: 'fo' tag without 'ruf' tag is ignored (RFC 9989)")
+
     for rep in ["ruf", "rua"]:
         if rep in dmarcdata:
             for uri in dmarcdata[rep].split(","):
