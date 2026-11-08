@@ -335,7 +335,7 @@ def check_mtasts(host):
         if k == "mode" and v == "report":
             # used until draft-ietf-uta-mta-sts-12
             errormsg("Obsolete (draft version) 'mode: report' MTA-STS mode")
-        elif k == "mode" and v not in ["testing", "enforce", "none"]:
+        elif k == "mode" and v not in {"testing", "enforce", "none"}:
             errormsg("Invalid MTA-STS mode")
 
 
